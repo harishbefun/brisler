@@ -5,6 +5,10 @@ Add-Type -AssemblyName System.Speech -ErrorAction SilentlyContinue
 
 $ErrorActionPreference = 'Stop'
 trap {
+    try {
+        $errorLog = Join-Path $env:TEMP 'Brisler-startup-error.txt'
+        [IO.File]::WriteAllText($errorLog, ($_ | Out-String), [Text.UTF8Encoding]::new($false))
+    } catch { }
     try { [Windows.MessageBox]::Show($_.Exception.ToString(), 'Brisler could not start', [Windows.MessageBoxButton]::OK, [Windows.MessageBoxImage]::Error) | Out-Null } catch { }
     break
 }
@@ -86,6 +90,7 @@ $state = @{
     history = @()
     pose = 0
     blinkUntil = [DateTime]::MinValue
+    nextBlinkAt = [DateTime]::UtcNow.AddSeconds((Get-Random -Minimum 3 -Maximum 7))
     poseUntil = [DateTime]::MinValue
     frame = -1
     startedAt = [DateTime]::UtcNow
@@ -288,7 +293,13 @@ $submitMessage = {
             $content = [Net.Http.ByteArrayContent]::new($bytes)
             $content.Headers.ContentType = [Net.Http.Headers.MediaTypeHeaderValue]::new('application/json')
             $response = $client.PostAsync('http://127.0.0.1:11434/api/chat', $content).GetAwaiter().GetResult()
-            $response.EnsureSuccessStatusCode()
+            if (-not $response.IsSuccessStatusCode) {
+                $detail = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+                if ([int]$response.StatusCode -eq 404) {
+                    throw 'The local model qwen3.5:4b is missing. Open PowerShell and run: ollama pull qwen3.5:4b'
+                }
+                throw "Ollama returned HTTP $([int]$response.StatusCode): $detail"
+            }
             $raw = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
             $eventArgs.Result = [string]$raw.message.content
         } finally { $client.Dispose() }
@@ -296,8 +307,14 @@ $submitMessage = {
     $worker.add_RunWorkerCompleted({ param($sender, $eventArgs)
         $sendButton.IsEnabled = $true
         if ($eventArgs.Error) {
-            $chatStatus.Text = 'local AI is not connected'
-            $hint = "I'm ready, but my local Ollama brain is not connected yet. Right-click me and choose Local AI setup."
+            $reason = $eventArgs.Error.GetBaseException().Message
+            if ($reason -match 'model qwen3\.5:4b is missing') {
+                $chatStatus.Text = 'local model needs to be downloaded'
+                $hint = "My local chat model isn't installed yet. Open PowerShell and run: ollama pull qwen3.5:4b. Right-click me and choose Local AI setup for details."
+            } else {
+                $chatStatus.Text = 'local AI is not connected'
+                $hint = "I couldn't reach Ollama on this PC. Install and start Ollama, then try again. Right-click me and choose Local AI setup for details."
+            }
             & $addChatLine 'Brisler' $hint
             & $showLine 'I need my local brain set up first. Right-click me for the steps.' 8
             return
@@ -327,8 +344,8 @@ $submitMessage = {
 $openChat = {
     if (-not $chatWindow.IsVisible) {
         $chatWindow.Owner = $window
-        $chatWindow.Left = [Math]::Min([SystemParameters]::WorkArea.Right - $chatWindow.Width, $window.Left + $window.Width)
-        $chatWindow.Top = [Math]::Max([SystemParameters]::WorkArea.Top, $window.Top + 10)
+        $chatWindow.Left = [Math]::Min([Windows.SystemParameters]::WorkArea.Right - $chatWindow.Width, $window.Left + $window.Width)
+        $chatWindow.Top = [Math]::Max([Windows.SystemParameters]::WorkArea.Top, $window.Top + 10)
         $chatWindow.Show()
         if ($messagePanel.Children.Count -eq 0) {
             & $addChatLine 'Brisler' "Hey! I'm here. Click Send to talk with me using the local model."
@@ -419,10 +436,12 @@ $clock.Add_Tick({
         $shadow.Opacity = 0.34 - ($bob * 0.025)
         $shadowScale.ScaleX = 1 + ($bob * 0.012)
         if ($state.pose -ne 0 -and $now -ge $state.poseUntil) { $state.pose = 0 }
-        if ($state.pose -eq 0 -and ($now - $lastFrameAt).TotalMilliseconds -ge 84) {
-            $state.frame = ($state.frame + 1) % $idleFrames.Count
-            $image.Source = if ($now -lt $state.blinkUntil) { $idleFrames[2] } else { $idleFrames[$state.frame] }
-            $lastFrameAt = $now
+        if ($state.pose -eq 0) {
+            if ($now -ge $state.nextBlinkAt -and $now -ge $state.blinkUntil) {
+                $state.blinkUntil = $now.AddMilliseconds(150)
+                $state.nextBlinkAt = $now.AddSeconds((Get-Random -Minimum 3 -Maximum 7))
+            }
+            $image.Source = if ($now -lt $state.blinkUntil) { $idleFrames[2] } else { $idleFrames[0] }
         } elseif ($state.pose -gt 0) {
             $poseIndex = [Math]::Max(0, [Math]::Min(5, $state.pose))
             if ($image.Source -ne $emotionFrames[$poseIndex]) { $image.Source = $emotionFrames[$poseIndex] }
@@ -443,7 +462,7 @@ $window.Add_Closed({
     if ($speechSynth) { $speechSynth.Dispose() }
 }.GetNewClosure())
 
-$window.Left = [SystemParameters]::WorkArea.Right - $window.Width - 40
-$window.Top = [SystemParameters]::WorkArea.Bottom - $window.Height - 80
+$window.Left = [Windows.SystemParameters]::WorkArea.Right - $window.Width - 40
+$window.Top = [Windows.SystemParameters]::WorkArea.Bottom - $window.Height - 80
 & $showLine 'Hey! I am Brisler.' 5
 [void]$window.ShowDialog()

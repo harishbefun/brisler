@@ -5,7 +5,7 @@ Brisler is a local-first animated desktop companion for Windows. He has a persis
 ## What it does
 
 - Runs as a small transparent desktop character. Drag him to a comfortable spot; click to pet him; double-click to open chat; right-click for controls.
-- Uses an 8-frame idle loop for breathing and blinking, with separate expression art for brief emotional reactions.
+- Uses gentle continuous floating, a stable idle drawing, occasional blinks, and separate expression art for brief emotional reactions.
 - Asks a local AI to choose his reply, mood, and reaction during conversation.
 - Saves a short conversation history and his mood, energy, and bond in `%LOCALAPPDATA%\Brisler\state.json`.
 - Can optionally speak replies using the Windows speech voice installed on your PC.
@@ -24,9 +24,9 @@ Brisler’s emotions are part of his fictional character simulation; he does not
 
    The quantized model download is about 3.4 GB. Ollama serves it locally on `127.0.0.1:11434`.
 3. Double-click **Start Brisler.vbs**. The app uses Windows PowerShell and WPF already included with Windows.
-4. Double-click Brisler to chat. Right-click him to pause animation, enable spoken replies, open setup help, reset local memory, or quit.
+4. Double-click Brisler to open chat. Type a message and press **Send** or Enter. Right-click him to pause animation, enable spoken replies, open setup help, reset local memory, or quit.
 
-Brisler can still float and respond to clicks without Ollama. Chat replies require Ollama and the model above. The model is a default; you can change it in `Brisler.ps1` if you have another model installed locally.
+Brisler can still float and respond to clicks without Ollama. Chat replies require Ollama and the model above. If Ollama or the model is unavailable, Brisler shows setup guidance in the chat. The model is a default; you can change it in `Brisler.ps1` if you have another model installed locally.
 
 ## Privacy
 
