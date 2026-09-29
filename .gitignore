@@ -1,0 +1,14 @@
+# Local companion data and logs
+state.json
+*.log
+
+# Editor and operating-system files
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+
+# Python/tool caches (useful for community scripts)
+__pycache__/
+.pytest_cache/
+*.py[cod]
