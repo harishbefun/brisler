@@ -7,6 +7,7 @@ Brisler is a local-first animated desktop companion for Windows. He has a persis
 - Runs as a small transparent desktop character. Drag him to a comfortable spot; click to pet him; double-click to open chat; right-click for controls.
 - Uses gentle continuous floating, a stable idle drawing, occasional blinks, and separate expression art for brief emotional reactions.
 - Asks a local AI to choose his reply, mood, and reaction during conversation.
+- Keeps chat offline by default; an optional per-message web-search checkbox can add DuckDuckGo results when internet is available.
 - Saves a short conversation history and his mood, energy, and bond in `%LOCALAPPDATA%\Brisler\state.json`.
 - Can optionally speak replies using the Windows speech voice installed on your PC.
 - Does not capture the screen, read other windows, control apps, or send data to a cloud AI service.
@@ -24,13 +25,13 @@ Brisler’s emotions are part of his fictional character simulation; he does not
 
    The quantized model download is about 2.7 GB. Once downloaded, chat works offline. Ollama serves it locally on `127.0.0.1:11434`.
 3. Double-click **Start Brisler.vbs**. The app uses Windows PowerShell and WPF already included with Windows.
-4. Double-click Brisler to open chat. Type a message and press **Send** or Enter. Right-click him to pause animation, enable spoken replies, open setup help, reset local memory, or quit.
+4. Double-click Brisler to open chat. Type a message and press **Send** or Enter. Check **Search web for this message** only when you want online results. Right-click him to pause animation, enable spoken replies, open setup help, reset local memory, or quit.
 
 Brisler can still float and respond to clicks without Ollama. Chat replies require Ollama and the model above. If Ollama or the model is unavailable, Brisler shows setup guidance in the chat. You can change the model in `%LOCALAPPDATA%\Brisler\settings.json` and edit Brisler's personality in `%LOCALAPPDATA%\Brisler\personality.txt`.
 
 ## Privacy
 
-The model runs on your PC through Ollama. Brisler sends the current message, recent chat history, and companion state to the local Ollama service at `127.0.0.1`; it does not make cloud AI requests. Chat history and companion state stay in the local AppData folder. Screen awareness and desktop control are intentionally out of scope.
+The model runs on your PC through Ollama. Normal chat sends the current message, recent chat history, and companion state only to Ollama at `127.0.0.1`; it does not make cloud AI requests. If web search is checked, Brisler sends that message's search query to DuckDuckGo and passes a few returned titles, links, and snippets to the local model. Chat history and companion state stay in the local AppData folder. Screen awareness and desktop control are intentionally out of scope.
 
 ## Project layout
 
