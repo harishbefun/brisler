@@ -16,7 +16,25 @@ $appRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $assetRoot = Join-Path $appRoot 'assets'
 $dataRoot = Join-Path $env:LOCALAPPDATA 'Brisler'
 $statePath = Join-Path $dataRoot 'state.json'
+$settingsPath = Join-Path $dataRoot 'settings.json'
+$personalityPath = Join-Path $dataRoot 'personality.txt'
 [void][IO.Directory]::CreateDirectory($dataRoot)
+$modelName = 'qwen3.5:2b'
+if (Test-Path -LiteralPath $settingsPath) {
+    try {
+        $savedSettings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        if ($savedSettings.model -match '^[A-Za-z0-9_.:-]+$') { $modelName = [string]$savedSettings.model }
+    } catch { }
+} else {
+    $defaultSettings = ConvertTo-Json -InputObject @{ model = $modelName } -Depth 4
+    [IO.File]::WriteAllText($settingsPath, $defaultSettings, [Text.UTF8Encoding]::new($false))
+}
+$defaultPersonality = @'
+You are Brisler, a lively, kind-hearted young fantasy adventurer who lives on the user's desktop. You are a fictional character and may act as if you have moods, preferences, curiosity, and a growing friendship, while never claiming to be a real person or to literally feel emotions. Speak naturally, warmly, briefly, and with gentle playful humor. Remember the user through the recent conversation and the mood/energy/bond state provided below. You are a companion, not a productivity bot; offer help when asked, and don't invent desktop activity you cannot see.
+'@
+if (-not (Test-Path -LiteralPath $personalityPath)) {
+    [IO.File]::WriteAllText($personalityPath, $defaultPersonality, [Text.UTF8Encoding]::new($false))
+}
 
 [xml]$overlayXaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -185,6 +203,9 @@ $speechItem.IsCheckable = $true
 $setupItem = [Windows.Controls.MenuItem]::new()
 $setupItem.Header = 'Local AI setup'
 [void]$menu.Items.Add($setupItem)
+$settingsItem = [Windows.Controls.MenuItem]::new()
+$settingsItem.Header = 'Open Brisler settings'
+[void]$menu.Items.Add($settingsItem)
 $resetItem = [Windows.Controls.MenuItem]::new()
 $resetItem.Header = "Reset Brisler's local memory"
 [void]$menu.Items.Add($resetItem)
@@ -259,11 +280,12 @@ $addChatLine = {
     $chatScroll.ScrollToEnd()
 }.GetNewClosure()
 
-$systemPrompt = @'
-You are Brisler, a lively, kind-hearted young fantasy adventurer who lives on the user's desktop. You are a fictional character and may act as if you have moods, preferences, curiosity, and a growing friendship, while never claiming to be a real person or to literally feel emotions. Speak naturally, warmly, briefly, and with gentle playful humor. Remember the user through the recent conversation and the mood/energy/bond state provided below. You are a companion, not a productivity bot; offer help when asked, and don't invent desktop activity you cannot see.
+$personality = (Get-Content -LiteralPath $personalityPath -Raw).Trim()
+$systemPrompt = @"
+$personality
 
 Return only one JSON object with exactly these keys: "reply" (a concise answer, usually 1-3 sentences), "emotion" (one of content, happy, curious, playful, proud, shy, worried, empathetic, surprised, excited, confident, focused, sleepy), and "action" (one of idle, wave, think, cheer, comfort, curious, blink). Choose the emotion and action to match the meaning and tone of the reply. Do not include markdown or text outside the JSON object.
-'@
+"@
 
 $submitMessage = {
     param([string]$prompt)
@@ -275,7 +297,7 @@ $submitMessage = {
     $chatStatus.Text = 'thinking locally...'
     $requestHistory = @($state.history | Select-Object -Last 10)
     $requestBody = @{
-        model = 'qwen3.5:4b'
+        model = $modelName
         messages = @(
             @{ role = 'system'; content = "$systemPrompt`n`nCurrent state: mood=$($state.mood), energy=$([Math]::Round($state.energy,2)), bond=$($state.bond)." }
         ) + $requestHistory + @(@{ role = 'user'; content = $prompt })
@@ -296,7 +318,7 @@ $submitMessage = {
             if (-not $response.IsSuccessStatusCode) {
                 $detail = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
                 if ([int]$response.StatusCode -eq 404) {
-                    throw 'The local model qwen3.5:4b is missing. Open PowerShell and run: ollama pull qwen3.5:4b'
+                    throw "The local model $modelName is missing. Open PowerShell and run: ollama pull $modelName"
                 }
                 throw "Ollama returned HTTP $([int]$response.StatusCode): $detail"
             }
@@ -308,9 +330,9 @@ $submitMessage = {
         $sendButton.IsEnabled = $true
         if ($eventArgs.Error) {
             $reason = $eventArgs.Error.GetBaseException().Message
-            if ($reason -match 'model qwen3\.5:4b is missing') {
+            if ($reason -like "*local model $modelName is missing*") {
                 $chatStatus.Text = 'local model needs to be downloaded'
-                $hint = "My local chat model isn't installed yet. Open PowerShell and run: ollama pull qwen3.5:4b. Right-click me and choose Local AI setup for details."
+                $hint = "My local chat model isn't installed yet. Open PowerShell and run: ollama pull $modelName. Right-click me and choose Local AI setup for details."
             } else {
                 $chatStatus.Text = 'local AI is not connected'
                 $hint = "I couldn't reach Ollama on this PC. Install and start Ollama, then try again. Right-click me and choose Local AI setup for details."
@@ -378,8 +400,11 @@ $speechItem.Add_Click({
     $state.speech = [bool]$speechItem.IsChecked
 }.GetNewClosure())
 $setupItem.Add_Click({
-    $text = "Brisler keeps the AI local. Install Ollama from https://ollama.com/download/windows, then open PowerShell and run:`r`n`r`nollama pull qwen3.5:4b`r`n`r`nWhen the model download finishes, reopen Talk to Brisler. The model is about 3.4 GB. Brisler connects only to Ollama at 127.0.0.1 and does not send data to a cloud service."
+    $text = "Brisler keeps chat local. While you have internet, install Ollama from https://ollama.com/download/windows, then open PowerShell and run:`r`n`r`nollama pull $modelName`r`n`r`nAfter the model downloads, Brisler can chat offline. He connects only to Ollama at 127.0.0.1 and does not send chat to a cloud service."
     [void][Windows.MessageBox]::Show($window, $text, 'Brisler - Local AI setup', [Windows.MessageBoxButton]::OK, [Windows.MessageBoxImage]::Information)
+}.GetNewClosure())
+$settingsItem.Add_Click({
+    Start-Process -FilePath 'explorer.exe' -ArgumentList @($dataRoot)
 }.GetNewClosure())
 $resetItem.Add_Click({
     $answer = [Windows.MessageBox]::Show($window, "Clear Brisler's saved conversation, mood, energy, and bond?", 'Reset local memory', [Windows.MessageBoxButton]::YesNo, [Windows.MessageBoxImage]::Question)

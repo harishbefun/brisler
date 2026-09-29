@@ -19,14 +19,14 @@ Brisler’s emotions are part of his fictional character simulation; he does not
 2. Open PowerShell and download the default local model:
 
    ```powershell
-   ollama pull qwen3.5:4b
+   ollama pull qwen3.5:2b
    ```
 
-   The quantized model download is about 3.4 GB. Ollama serves it locally on `127.0.0.1:11434`.
+   The quantized model download is about 2.7 GB. Once downloaded, chat works offline. Ollama serves it locally on `127.0.0.1:11434`.
 3. Double-click **Start Brisler.vbs**. The app uses Windows PowerShell and WPF already included with Windows.
 4. Double-click Brisler to open chat. Type a message and press **Send** or Enter. Right-click him to pause animation, enable spoken replies, open setup help, reset local memory, or quit.
 
-Brisler can still float and respond to clicks without Ollama. Chat replies require Ollama and the model above. If Ollama or the model is unavailable, Brisler shows setup guidance in the chat. The model is a default; you can change it in `Brisler.ps1` if you have another model installed locally.
+Brisler can still float and respond to clicks without Ollama. Chat replies require Ollama and the model above. If Ollama or the model is unavailable, Brisler shows setup guidance in the chat. You can change the model in `%LOCALAPPDATA%\Brisler\settings.json` and edit Brisler's personality in `%LOCALAPPDATA%\Brisler\personality.txt`.
 
 ## Privacy
 
